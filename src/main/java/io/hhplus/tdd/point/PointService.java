@@ -10,7 +10,8 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class PointService {
-    public static final long MAXIMUM_POINT = 1_000_000;
+    public static final long MAXIMUM_POINT = 1_000_000L;
+    public static final long ZERO_POINT = 0L;
     private final PointHistoryTable pointHistoryTable;
     private final UserPointTable userPointTable;
 
@@ -50,6 +51,29 @@ public class PointService {
         pointHistoryTable.insert(userId, amount, TransactionType.CHARGE, System.currentTimeMillis());
 
         return chargedUserPoint;
+    }
+
+    // 특정 유저의 포인트를 사용하는 기능
+    public UserPoint usePoint(long userId, long amount) {
+        List<PointHistory> pointHistories = pointHistoryTable.selectAllByUserId(userId);
+
+        if (pointHistories.isEmpty()) {
+            throw new RuntimeException("사용자 포인트 정보가 존재하지 않습니다.");
+        }
+
+        UserPoint userPoint = userPointTable.selectById(userId);
+
+        long totalPoint = userPoint.point() - amount;
+        if (totalPoint < ZERO_POINT) {
+            throw new RuntimeException("보유 포인트를 초과하여 사용할 수 없습니다.");
+        }
+        // 포인트 사용
+        UserPoint usedUserPoint = userPointTable.insertOrUpdate(userId, totalPoint);
+
+        // 사용 history
+        pointHistoryTable.insert(userId, amount, TransactionType.USE, System.currentTimeMillis());
+
+        return usedUserPoint;
     }
 
 }
