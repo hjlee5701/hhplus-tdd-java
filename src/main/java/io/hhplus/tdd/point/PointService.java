@@ -22,4 +22,9 @@ public class PointService {
         }
         return userPointTable.selectById(userId);
     }
+
+    // 특정 유저의 포인트 충전/이용 내역을 조회하는 기능
+    public List<PointHistory> findHistories(long userId) {
+        return pointHistoryTable.selectAllByUserId(userId);
+    }
 }
