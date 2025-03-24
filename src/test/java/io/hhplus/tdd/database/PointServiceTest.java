@@ -122,6 +122,76 @@ public class PointServiceTest {
         verify(pointHistoryTable).insert(eq(userId), eq(amount), eq(TransactionType.CHARGE), anyLong());
     }
 
+    @Test
+    @DisplayName("보유 포인트를 초과하여 사용 시 예외 발생한다.")
+    void 보유_포인트를_초과_사용() {
+        // given
+        long userId = 1L;
+        long currentPoint = 100L;
+        given(pointHistoryTable.selectAllByUserId(userId))
+                .willReturn(List.of(createPointHistory()));
+        given(userPointTable.selectById(userId))
+                .willReturn(new UserPoint(userId, currentPoint, System.currentTimeMillis()));
 
+        // when & then
+        RuntimeException exception = assertThrows(
+                RuntimeException.class,
+                () -> pointService.usePoint(userId, currentPoint + 100L)
+        );
+        assertEquals("보유 포인트를 초과하여 사용할 수 없습니다.", exception.getMessage());
+        verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
+        verify(pointHistoryTable, never()).insert(anyLong(), anyLong(), any(), anyLong());
+    }
+
+    @Test
+    @DisplayName("보유 포인트를 전부 사용 시 포인트 사용 성공한다.")
+    void 보유_포인트를_전부_사용() {
+        // given
+        long userId = 1L;
+        long currentPoint = 100L;
+        given(pointHistoryTable.selectAllByUserId(userId))
+                .willReturn(List.of(createPointHistory()));
+
+        given(userPointTable.selectById(userId))
+                .willReturn(new UserPoint(userId, currentPoint, System.currentTimeMillis()));
+
+        given(userPointTable.insertOrUpdate(userId, 0))
+                .willReturn(new UserPoint(userId, 0, System.currentTimeMillis()));
+
+        // when
+        UserPoint userPoint = pointService.usePoint(userId, currentPoint);
+
+        // then
+        assertEquals(0, userPoint.point());
+        verify(userPointTable, times(1)).insertOrUpdate(userId, 0);
+        verify(pointHistoryTable, times(1)).insert(eq(userId), eq(currentPoint), eq(TransactionType.USE), anyLong());
+    }
+
+    @Test
+    @DisplayName("보유 포인트 미만을 사용 시 포인트 사용 성공한다.")
+    void 보유_포인트_미만을_사용() {
+        // given
+        long userId = 1L;
+        long currentPoint = 100L;
+        long usePoint = 70L;
+        long extraPoint = currentPoint - usePoint; // 30L
+
+        given(pointHistoryTable.selectAllByUserId(userId))
+                .willReturn(List.of(createPointHistory()));
+
+        given(userPointTable.selectById(userId))
+                .willReturn(new UserPoint(userId, currentPoint, System.currentTimeMillis()));
+
+        given(userPointTable.insertOrUpdate(userId, extraPoint))
+                .willReturn(new UserPoint(userId, extraPoint, System.currentTimeMillis()));
+
+        // when
+        UserPoint userPoint = pointService.usePoint(userId, usePoint);
+
+        // then
+        assertEquals(extraPoint, userPoint.point());
+        verify(userPointTable, times(1)).insertOrUpdate(userId, extraPoint);
+        verify(pointHistoryTable, times(1)).insert(eq(userId), eq(usePoint), eq(TransactionType.USE), anyLong());
+    }
 
 }
