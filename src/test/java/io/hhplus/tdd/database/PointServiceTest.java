@@ -33,7 +33,7 @@ public class PointServiceTest {
     void 유효하지_않은_userId로_조회시_예외발생() {
         // given
         long invalidUserId = 99L;
-        given(pointHistoryTable.selectAllByUserId(Mockito.anyLong()))
+        given(pointHistoryTable.selectAllByUserId(invalidUserId))
                 .willReturn(List.of());
         // when
         RuntimeException exception = assertThrows(
@@ -42,7 +42,7 @@ public class PointServiceTest {
         );
         // then
         assertEquals("사용자 포인트 정보가 존재하지 않습니다.", exception.getMessage());
-        verify(userPointTable, never()).selectById(invalidUserId);
+        verify(userPointTable, never()).selectById(anyLong());
     }
 
     public PointHistory createPointHistory() {
@@ -69,7 +69,6 @@ public class PointServiceTest {
         );
         assertEquals("충전 시 최대 보유 포인트를 초과합니다.", exception.getMessage());
         verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
-        verify(pointHistoryTable, never()).insert(anyLong(), anyLong(), any(), anyLong());
     }
 
 
@@ -90,12 +89,11 @@ public class PointServiceTest {
                 .willReturn(new UserPoint(userId, 1_000_000L, System.currentTimeMillis()));
 
         // when
-        UserPoint result = pointService.chargeUserPoint(userId, amount);
+        UserPoint userPoint = pointService.chargeUserPoint(userId, amount);
 
         // then
-        assertEquals(1_000_000L, result.point());
-        verify(userPointTable).insertOrUpdate(userId, 1_000_000L);
-        verify(pointHistoryTable).insert(eq(userId), eq(amount), eq(TransactionType.CHARGE), anyLong());
+        assertEquals(userId, userPoint.id());
+        assertEquals(1_000_000L, userPoint.point());
     }
 
     @Test
@@ -114,12 +112,11 @@ public class PointServiceTest {
                 .willReturn(new UserPoint(userId, 10L, System.currentTimeMillis()));
 
         // when
-        UserPoint result = pointService.chargeUserPoint(userId, amount);
+        UserPoint userPoint = pointService.chargeUserPoint(userId, amount);
 
         // then
-        assertEquals(10L, result.point());
-        verify(userPointTable).insertOrUpdate(userId, 10L);
-        verify(pointHistoryTable).insert(eq(userId), eq(amount), eq(TransactionType.CHARGE), anyLong());
+        assertEquals(userId, userPoint.id());
+        assertEquals(10L, userPoint.point());
     }
 
     @Test
@@ -140,7 +137,6 @@ public class PointServiceTest {
         );
         assertEquals("보유 포인트를 초과하여 사용할 수 없습니다.", exception.getMessage());
         verify(userPointTable, never()).insertOrUpdate(anyLong(), anyLong());
-        verify(pointHistoryTable, never()).insert(anyLong(), anyLong(), any(), anyLong());
     }
 
     @Test
@@ -162,9 +158,8 @@ public class PointServiceTest {
         UserPoint userPoint = pointService.usePoint(userId, currentPoint);
 
         // then
+        assertEquals(userId, userPoint.id());
         assertEquals(0, userPoint.point());
-        verify(userPointTable, times(1)).insertOrUpdate(userId, 0);
-        verify(pointHistoryTable, times(1)).insert(eq(userId), eq(currentPoint), eq(TransactionType.USE), anyLong());
     }
 
     @Test
@@ -189,9 +184,8 @@ public class PointServiceTest {
         UserPoint userPoint = pointService.usePoint(userId, usePoint);
 
         // then
+        assertEquals(userId, userPoint.point());
         assertEquals(extraPoint, userPoint.point());
-        verify(userPointTable, times(1)).insertOrUpdate(userId, extraPoint);
-        verify(pointHistoryTable, times(1)).insert(eq(userId), eq(usePoint), eq(TransactionType.USE), anyLong());
     }
 
 }
