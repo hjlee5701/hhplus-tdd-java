@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -116,6 +117,79 @@ public class PointControllerTest {
                 .andExpect(jsonPath("$.[1].userId").value(validUserId))
                 .andExpect(jsonPath("$.[1].amount").value(amount))
                 .andExpect(jsonPath("$.[1].type").value("USE"))
+        ;
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] : 음수 amount로 충전 요청시 에외 응답 반환한다.")
+    void 음수인_amount로_충전_요청시_예외_응답() throws Exception {
+
+        // given
+        long validUserId = 1L;
+        long chargeAmount = -1L;
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/charge")
+                        .content(String.valueOf(chargeAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+        // then
+        result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.message").value("[최소 0포인트 이상 충전 가능합니다.]"));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] : 충전 요청 시 보유 포인트가 최대값을 초과될 시 예외 응답 반환한다.")
+    void 보유_포인트에서_초과_충전시_예외_응답() throws Exception {
+
+        // given
+        long validUserId = 1L;
+        long amount = 1_000_000L;
+        long chargeAmount = 100L;
+        userPointTable.insertOrUpdate(validUserId, amount);
+        pointHistoryTable.insert(validUserId, amount, TransactionType.CHARGE, System.currentTimeMillis());
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/charge")
+                        .content(String.valueOf(chargeAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+        // then
+        result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.message").value("충전 시 최대 보유 포인트를 초과합니다."));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/charge] : 특정 유저의 포인트 충전시 성공 응답 반환한다.")
+    void 포인트_충전시_성공_응답() throws Exception {
+        // given
+        long validUserId = 1L;
+        long amount = 100L;
+        long chargeAmount = 100;
+        userPointTable.insertOrUpdate(validUserId, amount);
+        pointHistoryTable.insert(validUserId, amount, TransactionType.CHARGE, System.currentTimeMillis());
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/charge")
+                        .content(String.valueOf(chargeAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+
+        // then
+        result
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(validUserId))
+                .andExpect(jsonPath("$.point").value(amount+chargeAmount))
         ;
     }
 
