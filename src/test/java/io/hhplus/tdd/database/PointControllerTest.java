@@ -11,6 +11,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -90,4 +91,32 @@ public class PointControllerTest {
                 .andExpect(jsonPath("$.point").value(amount))
         ;
     }
+
+    @Test
+    @DisplayName("[GET: /point/{id}/histories] 특정 유저의 포인트 충전/이용 내역을 조회시 성공 응답 반환한다.")
+    void 포인트_충전_이용_내역_조회시_성공_응답() throws Exception {
+        // given
+        long validUserId = 1L;
+        long amount = 100L;
+        pointHistoryTable.insert(validUserId, amount, TransactionType.CHARGE, System.currentTimeMillis());
+        pointHistoryTable.insert(validUserId, amount, TransactionType.USE, System.currentTimeMillis());
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .get("/point/"+validUserId+"/histories")
+        );
+        // then
+        result
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$.[0].userId").value(validUserId))
+                .andExpect(jsonPath("$.[0].amount").value(amount))
+                .andExpect(jsonPath("$.[0].type").value("CHARGE"))
+                .andExpect(jsonPath("$.[1].userId").value(validUserId))
+                .andExpect(jsonPath("$.[1].amount").value(amount))
+                .andExpect(jsonPath("$.[1].type").value("USE"))
+        ;
+    }
+
 }

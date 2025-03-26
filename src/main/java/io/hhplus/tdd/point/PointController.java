@@ -37,7 +37,7 @@ public class PointController {
             @Min(value = 1, message = "유효한 userId 가 아닙니다.")
             @PathVariable("id") long userId
     ) {
-        return List.of();
+        return pointService.findHistories(userId);
     }
 
     /**
