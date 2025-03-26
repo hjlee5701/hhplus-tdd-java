@@ -1,13 +1,17 @@
 package io.hhplus.tdd.point;
 
+import jakarta.validation.constraints.Min;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/point")
+@Validated
 public class PointController {
 
     private static final Logger log = LoggerFactory.getLogger(PointController.class);
@@ -17,7 +21,8 @@ public class PointController {
      */
     @GetMapping("{id}")
     public UserPoint point(
-            @PathVariable long id
+            @Min(value = 1, message = "유효한 userId 가 아닙니다.")
+            @PathVariable("id") long userId
     ) {
         return new UserPoint(0, 0, 0);
     }
@@ -27,7 +32,8 @@ public class PointController {
      */
     @GetMapping("{id}/histories")
     public List<PointHistory> history(
-            @PathVariable long id
+            @Min(value = 1, message = "유효한 userId 가 아닙니다.")
+            @PathVariable("id") long userId
     ) {
         return List.of();
     }
@@ -37,7 +43,10 @@ public class PointController {
      */
     @PatchMapping("{id}/charge")
     public UserPoint charge(
-            @PathVariable long id,
+            @Min(value = 1, message = "유효한 userId 가 아닙니다.")
+            @PathVariable("id") long userId,
+            
+            @Min(value = 0, message = "최소 0포인트 이상 충전 가능합니다.")
             @RequestBody long amount
     ) {
         return new UserPoint(0, 0, 0);
@@ -48,7 +57,10 @@ public class PointController {
      */
     @PatchMapping("{id}/use")
     public UserPoint use(
-            @PathVariable long id,
+            @Min(value = 1, message = "유효한 userId 가 아닙니다.")
+            @PathVariable("id") long userId,
+
+            @Min(value = 0, message = "최소 0포인트 이상 사용 가능합니다.")
             @RequestBody long amount
     ) {
         return new UserPoint(0, 0, 0);
