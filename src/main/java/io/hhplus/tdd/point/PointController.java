@@ -65,6 +65,6 @@ public class PointController {
             @Min(value = 0, message = "최소 0포인트 이상 사용 가능합니다.")
             @RequestBody long amount
     ) {
-        return new UserPoint(0, 0, 0);
+        return pointService.usePoint(userId, amount);
     }
 }

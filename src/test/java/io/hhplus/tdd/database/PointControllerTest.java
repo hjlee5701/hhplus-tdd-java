@@ -193,4 +193,76 @@ public class PointControllerTest {
         ;
     }
 
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] : 음수 amount로 포인트 사용 요청시 에외 응답 반환한다.")
+    void 음수인_amount로_사용_요청시_예외_응답() throws Exception {
+
+        // given
+        long validUserId = 1L;
+        long useAmount = -1L;
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/use")
+                        .content(String.valueOf(useAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+        // then
+        result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.message").value("[최소 0포인트 이상 사용 가능합니다.]"));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] : 보유 포인트가 초과 사용 요청시 예외 응답 반환한다.")
+    void 보유_포인트_초과_사용시_예외_응답() throws Exception {
+
+        // given
+        long validUserId = 1L;
+        long amount = 100L;
+        long useAmount = 200L;
+        userPointTable.insertOrUpdate(validUserId, amount);
+        pointHistoryTable.insert(validUserId, amount, TransactionType.CHARGE, System.currentTimeMillis());
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/use")
+                        .content(String.valueOf(useAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+        // then
+        result
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("400"))
+                .andExpect(jsonPath("$.message").value("보유 포인트를 초과하여 사용할 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("[PATCH /point/{id}/use] : 특정 유저의 포인트 충전시 성공 응답 반환한다.")
+    void 보유_포인트_사용시_성공_응답() throws Exception {
+
+        // given
+        long validUserId = 1L;
+        long amount = 200L;
+        long useAmount = 100L;
+        userPointTable.insertOrUpdate(validUserId, amount);
+        pointHistoryTable.insert(validUserId, amount, TransactionType.CHARGE, System.currentTimeMillis());
+
+        // when
+        ResultActions result = mockMvc.perform(
+                MockMvcRequestBuilders
+                        .patch("/point/"+validUserId+"/use")
+                        .content(String.valueOf(useAmount))
+                        .contentType(MediaType.APPLICATION_JSON)
+        );
+        // then
+        result
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(validUserId))
+                .andExpect(jsonPath("$.point").value(amount-useAmount));
+    }
 }
