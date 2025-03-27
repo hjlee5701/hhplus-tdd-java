@@ -11,11 +11,12 @@ import java.util.List;
 @RequiredArgsConstructor
 @Service
 public class PointService {
-    public static final long MAXIMUM_POINT = 1_000_000L;
-    public static final long ZERO_POINT = 0L;
+
     private final PointHistoryTable pointHistoryTable;
     private final UserPointTable userPointTable;
     private final LockExecutor lockExecutor;
+    private final PointValidator pointValidator;
+
 
     // 특정 유저의 포인트를 조회하는 기능
     public UserPoint findUserPointById(long userId) {
@@ -35,6 +36,9 @@ public class PointService {
     // 특정 유저의 포인트를 충전하는 기능
     public UserPoint chargeUserPoint(long userId, long amount) {
 
+        // 포인트 최대값 초과 유효성 검증
+        pointValidator.validatedChargePoint(amount);
+
         return lockExecutor.executeWithUserLock(userId, () -> {
 
             List<PointHistory> pointHistories = pointHistoryTable.selectAllByUserId(userId);
@@ -44,10 +48,11 @@ public class PointService {
             }
 
             UserPoint userPoint = userPointTable.selectById(userId);
+
+            // 포인트 최대값 초과 유효성 검증
             long totalPoint = amount + userPoint.point();
-            if (totalPoint > MAXIMUM_POINT) {
-                throw new RuntimeException("충전 시 최대 보유 포인트를 초과합니다.");
-            }
+            pointValidator.validatedChargePoint(totalPoint);
+            
             // 포인트 충전
             UserPoint chargedUserPoint = userPointTable.insertOrUpdate(userId, totalPoint);
 
@@ -60,6 +65,9 @@ public class PointService {
 
     // 특정 유저의 포인트를 사용하는 기능
     public UserPoint usePoint(long userId, long amount) {
+
+        pointValidator.validatedUsePoint(amount);
+
         return lockExecutor.executeWithUserLock(userId, () -> {
             List<PointHistory> pointHistories = pointHistoryTable.selectAllByUserId(userId);
 
@@ -70,9 +78,8 @@ public class PointService {
             UserPoint userPoint = userPointTable.selectById(userId);
 
             long totalPoint = userPoint.point() - amount;
-            if (totalPoint < ZERO_POINT) {
-                throw new RuntimeException("보유 포인트를 초과하여 사용할 수 없습니다.");
-            }
+            pointValidator.validatedUsePoint(totalPoint);
+
             // 포인트 사용
             UserPoint usedUserPoint = userPointTable.insertOrUpdate(userId, totalPoint);
 
