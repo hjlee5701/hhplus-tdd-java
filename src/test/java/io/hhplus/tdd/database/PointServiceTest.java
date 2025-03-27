@@ -35,9 +35,6 @@ public class PointServiceTest {
     @InjectMocks
     private PointService pointService;
 
-    private final long MAXIMUM_POINT = PointPolicy.MAXIMUM_POINT.getAmount();
-    private final long ZERO_POINT = PointPolicy.ZERO_POINT.getAmount();
-
     private PointHistory createPointHistory() {
         return new PointHistory(1L, 1L, 0, TransactionType.CHARGE, System.currentTimeMillis());
     }
