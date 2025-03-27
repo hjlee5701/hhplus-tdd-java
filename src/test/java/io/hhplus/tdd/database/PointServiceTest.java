@@ -1,15 +1,19 @@
 package io.hhplus.tdd.database;
 
-import io.hhplus.tdd.point.*;
+import io.hhplus.tdd.concurrent.LockExecutor;
+import io.hhplus.tdd.point.PointHistory;
+import io.hhplus.tdd.point.PointService;
+import io.hhplus.tdd.point.TransactionType;
+import io.hhplus.tdd.point.UserPoint;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -25,8 +29,22 @@ public class PointServiceTest {
     @Mock
     private PointHistoryTable pointHistoryTable;
 
+    @Mock
+    private LockExecutor lockExecutor;
+
     @InjectMocks
     private PointService pointService;
+
+    private PointHistory createPointHistory() {
+        return new PointHistory(1L, 1L, 0, TransactionType.CHARGE, System.currentTimeMillis());
+    }
+    private void ignoringUserLock(long userId) {
+        given(lockExecutor.executeWithUserLock(eq(userId), any()))
+                .willAnswer(invocation -> {
+                    Supplier<?> task = invocation.getArgument(1);
+                    return task.get(); // 실제로 task 실행되도록
+                });
+    }
 
     @Test
     @DisplayName("PointHistory 에 존재하지 않은 userId 로 조회할 시 예외가 발생한다.")
@@ -35,6 +53,7 @@ public class PointServiceTest {
         long invalidUserId = 99L;
         given(pointHistoryTable.selectAllByUserId(invalidUserId))
                 .willReturn(List.of());
+
         // when
         RuntimeException exception = assertThrows(
                 RuntimeException.class,
@@ -45,9 +64,7 @@ public class PointServiceTest {
         verify(userPointTable, never()).selectById(anyLong());
     }
 
-    public PointHistory createPointHistory() {
-        return new PointHistory(1L, 1L, 0, TransactionType.CHARGE, System.currentTimeMillis());
-    }
+
 
     @Test
     @DisplayName("충전 시 보유 포인트 + 충전 금액이 최대값을 초과하면 예외 발생한다.")
@@ -61,6 +78,8 @@ public class PointServiceTest {
 
         given(userPointTable.selectById(userId))
                 .willReturn(new UserPoint(userId, currentPoint, System.currentTimeMillis()));
+
+        ignoringUserLock(userId);
 
         // when & then
         RuntimeException exception = assertThrows(
@@ -88,6 +107,8 @@ public class PointServiceTest {
         given(userPointTable.insertOrUpdate(userId, 1_000_000L))
                 .willReturn(new UserPoint(userId, 1_000_000L, System.currentTimeMillis()));
 
+        ignoringUserLock(userId);
+
         // when
         UserPoint userPoint = pointService.chargeUserPoint(userId, amount);
 
@@ -111,6 +132,7 @@ public class PointServiceTest {
         given(userPointTable.insertOrUpdate(userId, 10L))
                 .willReturn(new UserPoint(userId, 10L, System.currentTimeMillis()));
 
+        ignoringUserLock(userId);
         // when
         UserPoint userPoint = pointService.chargeUserPoint(userId, amount);
 
@@ -118,6 +140,31 @@ public class PointServiceTest {
         assertEquals(userId, userPoint.id());
         assertEquals(10L, userPoint.point());
     }
+
+    @DisplayName("충전 성공 시 PointHistory 에 사용자의 충전 기록이 저장된다.")
+    @Test
+    void 충전_성공시_PointHistory에_저장() {
+        // given
+        long userId = 1L;
+        long amount = 10L;
+        given(pointHistoryTable.selectAllByUserId(userId))
+                .willReturn(List.of(createPointHistory()));
+
+        given(userPointTable.selectById(userId))
+                .willReturn(new UserPoint(userId, 0L, System.currentTimeMillis()));
+
+        given(userPointTable.insertOrUpdate(userId, 10L))
+                .willReturn(new UserPoint(userId, 10L, System.currentTimeMillis()));
+
+        ignoringUserLock(userId);
+        // when
+        UserPoint userPoint = pointService.chargeUserPoint(userId, amount);
+
+        // then
+        assertEquals(10L, userPoint.point());
+        verify(pointHistoryTable).insert(eq(userId), eq(amount), eq(TransactionType.CHARGE), anyLong());
+    }
+
 
     @Test
     @DisplayName("보유 포인트를 초과하여 사용 시 예외 발생한다.")
@@ -129,6 +176,8 @@ public class PointServiceTest {
                 .willReturn(List.of(createPointHistory()));
         given(userPointTable.selectById(userId))
                 .willReturn(new UserPoint(userId, currentPoint, System.currentTimeMillis()));
+
+        ignoringUserLock(userId);
 
         // when & then
         RuntimeException exception = assertThrows(
@@ -154,6 +203,7 @@ public class PointServiceTest {
         given(userPointTable.insertOrUpdate(userId, 0))
                 .willReturn(new UserPoint(userId, 0, System.currentTimeMillis()));
 
+        ignoringUserLock(userId);
         // when
         UserPoint userPoint = pointService.usePoint(userId, currentPoint);
 
@@ -180,11 +230,12 @@ public class PointServiceTest {
         given(userPointTable.insertOrUpdate(userId, extraPoint))
                 .willReturn(new UserPoint(userId, extraPoint, System.currentTimeMillis()));
 
+        ignoringUserLock(userId);
         // when
         UserPoint userPoint = pointService.usePoint(userId, usePoint);
 
         // then
-        assertEquals(userId, userPoint.point());
+        assertEquals(userId, userPoint.id());
         assertEquals(extraPoint, userPoint.point());
     }
 
