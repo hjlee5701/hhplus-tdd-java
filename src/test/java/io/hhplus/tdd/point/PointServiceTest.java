@@ -1,7 +1,8 @@
-package io.hhplus.tdd.database;
+package io.hhplus.tdd.point;
 
 import io.hhplus.tdd.concurrent.LockExecutor;
-import io.hhplus.tdd.point.*;
+import io.hhplus.tdd.database.PointHistoryTable;
+import io.hhplus.tdd.database.UserPointTable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

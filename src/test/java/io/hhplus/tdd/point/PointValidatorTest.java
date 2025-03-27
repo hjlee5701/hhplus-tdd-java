@@ -1,8 +1,6 @@
-package io.hhplus.tdd.database;
+package io.hhplus.tdd.point;
 
 
-import io.hhplus.tdd.point.PointPolicy;
-import io.hhplus.tdd.point.PointValidator;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
