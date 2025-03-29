@@ -27,6 +27,7 @@ dependencies {
     annotationProcessor(libs.lombok)
     annotationProcessor(libs.spring.boot.configuration.processor)
     testImplementation(libs.spring.boot.starter.test)
+    implementation("org.springframework.boot:spring-boot-starter-validation")
 }
 
 // about source and compilation
